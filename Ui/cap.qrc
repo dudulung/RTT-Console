@@ -1,0 +1,46 @@
+<RCC>
+  <qresource prefix="encrypt">
+    <file>icons/save.png</file>
+    <file>icons/042b_AddCategory_16x16_72.png</file>
+    <file>icons/126_Edit_24x24_72.png</file>
+    <file>icons/2009724112955928.png</file>
+    <file>icons/2012227133244594.png</file>
+    <file>icons/20110125140425465.png</file>
+    <file>icons/20110125140425466.png</file>
+    <file>icons/aPaw.png</file>
+    <file>icons/back.png</file>
+    <file>icons/comport.png</file>
+    <file>icons/cross.png</file>
+    <file>icons/data_right.png</file>
+    <file>icons/foot.png</file>
+    <file>icons/forward.png</file>
+    <file>icons/gear.png</file>
+    <file>icons/Help.png</file>
+    <file>icons/info.png</file>
+    <file>icons/logo2.PNG</file>
+    <file>icons/mystyle.qss</file>
+    <file>icons/ok.png</file>
+    <file>icons/pander.ico</file>
+    <file>icons/png-0007.png</file>
+    <file>icons/png-0017.png</file>
+    <file>icons/png-0063.png</file>
+    <file>icons/png-0066.png</file>
+    <file>icons/png-0621.png</file>
+    <file>icons/png-0622.png</file>
+    <file>icons/png-0623.png</file>
+    <file>icons/png-0629.png</file>
+    <file>icons/png-0630.png</file>
+    <file>icons/quit.png</file>
+    <file>icons/right.png</file>
+    <file>icons/Send.png</file>
+    <file>icons/stm32.ico</file>
+    <file>icons/submit.png</file>
+    <file>icons/switch.png</file>
+    <file>icons/user.png</file>
+    <file>icons/wrong.png</file>
+    <file>icons/zhengda.ico</file>
+    <file>icons/mystyle.qss</file>
+    <file>icons/pander.ico</file>
+    <file>icons/aPaw.png</file>
+  </qresource>
+</RCC>
