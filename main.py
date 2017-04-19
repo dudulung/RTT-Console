@@ -1,56 +1,59 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os, sys
-import ui_MainWindow
+from Ui import ui_MainWindow
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFontDialog, QFileDialog, QMessageBox
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 import struct
 import threading, time
-import configparser
-import jlink_lib
+import jlink
 from kfifo import *
 
 COTEX_RAM_BASE = 0x20000000
 RTT_TAG        = "SEGGER RTT"
 
+if getattr(sys, 'frozen', False): # we are running in a |PyInstaller| bundle
+    basedir = sys._MEIPASS
+else: # we are running in a normal Python environment
+    basedir = os.path.dirname(__file__)
+
+jlinkdllpath = os.path.join(basedir, "JLink_x64.dll")
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.ui = ui_MainWindow.Ui_MainWindow()
-        self.ui.setupUi(self)
+        self.uiInit()
         self.action_init()
         self.jlink   = None
         self.RTT_addr = None
         self.aUp     = None
         self.aDown   = None
-        self.dllpath = None
         self.closed  = False
-        self.init_setting()
         threading.Thread(target=self.serial_recv).start()
+
+    def uiInit(self):
+        self.ui = ui_MainWindow.Ui_MainWindow()
+        self.ui.setupUi(self)
+        self.ui.plainTextEdit.document().setMaximumBlockCount(1000)
+
+        self.lineLbl = QtWidgets.QLabel()
+        self.lineLbl.setToolTip(u"行数")
+        self.lineLbl.setText("0")
+        self.ui.statusbar.addPermanentWidget(self.lineLbl)
 
     def action_init(self):
         self.ui.actionStart.triggered.connect(self.on_btn_start_clicked)
         self.ui.actionFont.triggered.connect(self.on_btn_font_clicked)
         self.ui.actionClear.triggered.connect(self.on_btn_clear_clicked)
-        self.ui.actionDll.triggered.connect(self.on_btn_dll_clicked)
+        self.ui.actionSave.triggered.connect(self.onBtnSaveClicked)
+        self.ui.actionAbout.triggered.connect(self.about)
         self.ui.plainTextEdit.signal_key.connect(self.on_text_edit_key_pressed)
 
-    def init_setting(self):
-        if not os.path.exists('setting.ini'):
-            open('setting.ini', 'w')
-
-        self.conf = configparser.ConfigParser()
-        self.conf.read('setting.ini')
-
-        if not self.conf.has_section('globals'):
-            self.conf.add_section('globals')
-            #self.conf.set('globals', 'dllpath', JLINK_DLL_PATH)
-        try:
-            self.dllpath = self.conf.get('globals', 'dllpath')
-        except configparser.NoOptionError as e:
-            self.dllpath = None
+    def about(self):
+        QMessageBox.about(self, "About Console",
+                          "Version 1.0 build at 20170419<br/>"
+                          "Copyright @ dudulung<br/>")
 
     def get_RTT_addr(self):
         data = self.jlink.read(COTEX_RAM_BASE, 0x80)
@@ -97,33 +100,37 @@ class MainWindow(QMainWindow):
 
     def on_btn_clear_clicked(self):
         self.ui.plainTextEdit.clear()
+        self.lineLbl.setText("0")
 
-    def on_btn_dll_clicked(self):
-        fname, ftype = QFileDialog.getOpenFileName(self, u"请选择JLinkARM.dll", ".", "DLL Files(*.dll)")
-        if fname: self.dllpath = fname
+    def onBtnSaveClicked(self):
+        fname, ftype = QFileDialog.getSaveFileName(self, u"请选择保存文件", ".", "LOG Files(*.log)")
+        if fname:
+            with open(fname, 'w') as logfile:
+                logfile.write(str(self.ui.plainTextEdit.toPlainText()))
 
     def on_btn_start_clicked(self):
         if self.ui.actionStart.text() == u'Start':
             try:
-                self.jlink = jlink_lib.Jlink(self.dllpath)
-                self.jlink.set_mode(jlink_lib.JLINK_MODE_SWD)
+                self.jlink = jlink.Jlink(jlinkdllpath)
+                self.jlink.set_mode(jlink.JLINK_MODE_SWD)
                 self.jlink.set_speed(4000)
                 self.RTT_addr = self.get_RTT_addr()
                 self.setup_ring_buffer()
-                self.ui.statusbar.showMessage(u"开启监控成功！！！")
+                self.ui.statusbar.showMessage(u"开启监控成功")
                 self.ui.actionStart.setText(u'Stop')
-                self.dllpath = self.jlink.get_dll_path()
-            except jlink_lib.JlinkError as e:
-                QMessageBox.critical(self, u"错误", u"未找到JLinkARM.dll,请手动选择该文件路径后重试！")
+            except jlink.JlinkError as e:
+                QMessageBox.critical(self, u"错误", u"未能找到JLinkARM.dll,请手动选择该文件后重试")
                 self.on_btn_dll_clicked()
             except Exception as e:
                 print(e)
-                self.ui.statusbar.showMessage(u"开启监控失败！！！")
+                self.ui.statusbar.showMessage(u"开启监控失败")
         else:
             self.ui.actionStart.setText(u'Start')
             time.sleep(0.1)
             self.jlink.close()
-            self.ui.statusbar.showMessage(u"关闭监控成功！！！")
+            del self.jlink
+            self.jlink = None
+            self.ui.statusbar.showMessage(u"关闭监控成功")
 
     def update_ring_buffer(self):
         self.aUp.WrOff   = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 0 + 0)
@@ -165,19 +172,17 @@ class MainWindow(QMainWindow):
             time.sleep(0.01)
 
     def on_received(self, bytesUp):
-        if len(self.ui.plainTextEdit.toPlainText()) > 25000:
-            self.ui.plainTextEdit.clear()
-        self.ui.plainTextEdit.moveCursor(QtGui.QTextCursor.End)
-        self.ui.plainTextEdit.insertPlainText(bytesUp.decode())
-        self.ui.plainTextEdit.moveCursor(QtGui.QTextCursor.End)
+        try:
+            self.ui.plainTextEdit.moveCursor(QtGui.QTextCursor.End)
+            self.ui.plainTextEdit.insertPlainText(bytesUp.decode())
+            self.ui.plainTextEdit.moveCursor(QtGui.QTextCursor.End)
+            self.lineLbl.setText(str(self.ui.plainTextEdit.document().lineCount()))
+        except Exception as e:
+            QMessageBox.critical(self, u"错误", str(e))
 
     def closeEvent(self, evt):
         self.closed = True
         time.sleep(0.1)
-        if self.dllpath is not None:
-            self.conf.set('globals', 'dllpath', self.dllpath)
-        self.conf.write(open('setting.ini', 'w'))
-
         if self.jlink and self.jlink.is_open():
             self.jlink.close()
 
