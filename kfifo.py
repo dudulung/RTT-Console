@@ -13,8 +13,11 @@ class RingBuffer(object):
     def fifo_empty(self):
         return self.WrOff == self.RdOff
 
+    def fifo_size(self):
+        return self.mask + 1
+
     def fifo_len(self):
-        return (self.WrOff - self.RdOff) & MASK_32
+        return min((self.WrOff - self.RdOff) & MASK_32, self.fifo_size())
 
     def fifo_unused(self):
         return self.mask + 1 - self.fifo_len()

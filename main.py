@@ -52,15 +52,18 @@ class MainWindow(QMainWindow):
 
     def about(self):
         QMessageBox.about(self, "About Console",
-                          "Version 1.0 build at 20170419<br/>"
+                          "Version 1.1 build at 20170419<br/>"
                           "Copyright @ dudulung<br/>")
 
     def get_RTT_addr(self):
-        data = self.jlink.read(COTEX_RAM_BASE, 0x80)
-        addr = data.find(RTT_TAG.encode())
-        if addr == -1:
-            return COTEX_RAM_BASE
-        return COTEX_RAM_BASE + addr
+        idx = 0
+        while idx < (20*1024):
+            data = self.jlink.read(COTEX_RAM_BASE + idx, 0x80)
+            addr = data.find(RTT_TAG.encode())
+            if addr >= 0:
+                return COTEX_RAM_BASE + idx + addr
+            idx += 0x80-16
+        return COTEX_RAM_BASE
 
     def mem_read(self, addr, data_len):
         return self.jlink.read(addr, data_len)
@@ -112,6 +115,7 @@ class MainWindow(QMainWindow):
         if self.ui.actionStart.text() == u'Start':
             try:
                 self.jlink = jlink.Jlink(jlinkdllpath)
+                self.jlink.get_hardware_verion()
                 self.jlink.set_mode(jlink.JLINK_MODE_SWD)
                 self.jlink.set_speed(4000)
                 self.RTT_addr = self.get_RTT_addr()
@@ -119,8 +123,10 @@ class MainWindow(QMainWindow):
                 self.ui.statusbar.showMessage(u"开启监控成功")
                 self.ui.actionStart.setText(u'Stop')
             except jlink.JlinkError as e:
-                QMessageBox.critical(self, u"错误", u"未能找到JLinkARM.dll,请手动选择该文件后重试")
-                self.on_btn_dll_clicked()
+                QMessageBox.critical(self, u"错误", u"'{}'.".format(e))
+                #self.on_btn_dll_clicked()
+                del self.jlink
+                self.jlink = None
             except Exception as e:
                 print(e)
                 self.ui.statusbar.showMessage(u"开启监控失败")
@@ -133,8 +139,10 @@ class MainWindow(QMainWindow):
             self.ui.statusbar.showMessage(u"关闭监控成功")
 
     def update_ring_buffer(self):
-        self.aUp.WrOff   = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 0 + 0)
-        self.aDown.RdOff = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 1 + 4)
+        self.aUp.WrOff   = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 0 + 4 * 0)
+        self.aUp.RdOff   = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 0 + 4 * 1)
+        self.aUp.pBuffer = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 0 + 4 * 4)
+        self.aDown.RdOff = self.jlink.read_32(self.RTT_addr + 16 + (4 * 5) * 1 + 4 * 1)
 
     def chn_down_full(self):
         return self.aDown.fifo_full()

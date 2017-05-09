@@ -110,6 +110,13 @@ class Jlink(object):
         else:
             raise JlinkError("Could not load JLinkARM.dll.")
 
+    def __del__(self):
+        try:
+            if self.jlink:
+                ctypes.cdll.kernel32.FreeLibrary(self.jlink._handle)
+        except Exception as e:
+            print("Could not unload the JLINK DLL: '{}'.".format(e))
+
     def get_dll_path(self):
         return self.dllpath
 
@@ -360,8 +367,14 @@ class Jlink(object):
 
 
     def get_hardware_verion(self):
-        #UInt32 JLINKARM_GetHardwareVersion()
-        return self.jlink.JLINKARM_GetHardwareVersion()
+        """
+        got jlink hardware version
+        :return: UInt32
+        """
+        ret = self.jlink.JLINKARM_GetHardwareVersion()
+        if ret == 0:
+            raise JlinkError("Could not probe JLink hardware.")
+        return ret
 
     def get_feature_string(self):
         buffer_size = ctypes.c_uint32(255)
